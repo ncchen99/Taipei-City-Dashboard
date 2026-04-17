@@ -4,12 +4,37 @@ package models
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 	"time"
 
 	"TaipeiCityDashboardBE/logs"
 
 	"github.com/lib/pq"
 )
+
+// #region agent log
+func writeDashboardDebugLog(hypothesisID, location, message string, data map[string]interface{}) {
+	payload := map[string]interface{}{
+		"sessionId":    "1c6a77",
+		"runId":        "pre-fix",
+		"hypothesisId": hypothesisID,
+		"location":     location,
+		"message":      message,
+		"data":         data,
+		"timestamp":    time.Now().UnixMilli(),
+	}
+	b, err := json.Marshal(payload)
+	if err != nil {
+		return
+	}
+	f, err := os.OpenFile("/Users/ncchen/Documents/Taipei-City-Dashboard/.cursor/debug-1c6a77.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return
+	}
+	defer f.Close()
+	_, _ = fmt.Fprintln(f, string(b))
+}
+// #endregion
 
 /* ----- Models ----- */
 
@@ -45,6 +70,11 @@ type allDashboards struct {
 }
 
 func GetAllDashboards(accountID int) (dashboards allDashboards, err error) {
+	// #region agent log
+	writeDashboardDebugLog("H1", "app/models/dashboard.go:GetAllDashboards", "start GetAllDashboards", map[string]interface{}{
+		"accountID": accountID,
+	})
+	// #endregion
 	// Get all the public group dashboards
 	err = DBManager.
 		Joins("JOIN dashboard_groups ON dashboards.id = dashboard_groups.dashboard_id AND dashboard_groups.group_id = ?", 1).
@@ -53,6 +83,11 @@ func GetAllDashboards(accountID int) (dashboards allDashboards, err error) {
 		Error
 
 	if err != nil {
+		// #region agent log
+		writeDashboardDebugLog("H2", "app/models/dashboard.go:GetAllDashboards", "public query failed", map[string]interface{}{
+			"error": err.Error(),
+		})
+		// #endregion
 		return dashboards, err
 	}
 
@@ -64,6 +99,11 @@ func GetAllDashboards(accountID int) (dashboards allDashboards, err error) {
 		Error
 
 	if err != nil {
+		// #region agent log
+		writeDashboardDebugLog("H3", "app/models/dashboard.go:GetAllDashboards", "taipei query failed", map[string]interface{}{
+			"error": err.Error(),
+		})
+		// #endregion
 		return dashboards, err
 	}
 
@@ -75,6 +115,11 @@ func GetAllDashboards(accountID int) (dashboards allDashboards, err error) {
 		Error
 
 	if err != nil {
+		// #region agent log
+		writeDashboardDebugLog("H3", "app/models/dashboard.go:GetAllDashboards", "metrotaipei query failed", map[string]interface{}{
+			"error": err.Error(),
+		})
+		// #endregion
 		return dashboards, err
 	}
 
@@ -99,9 +144,26 @@ func GetAllDashboards(accountID int) (dashboards allDashboards, err error) {
 			Joins("JOIN dashboard_groups as dg ON dashboards.id = dg.dashboard_id AND dg.group_id IN (?)", subQuery).
 			Find(&dashboards.Personal).
 			Error
+		if err != nil {
+			// #region agent log
+			writeDashboardDebugLog("H4", "app/models/dashboard.go:GetAllDashboards", "personal query failed", map[string]interface{}{
+				"accountID": accountID,
+				"error":     err.Error(),
+			})
+			// #endregion
+		}
 	} else {
 		dashboards.Personal =[]Dashboard{}
 	}
+	// #region agent log
+	writeDashboardDebugLog("H5", "app/models/dashboard.go:GetAllDashboards", "GetAllDashboards finished", map[string]interface{}{
+		"publicCount":      len(dashboards.Public),
+		"taipeiCount":      len(dashboards.Taipei),
+		"metrotaipeiCount": len(dashboards.MetroTaipei),
+		"personalCount":    len(dashboards.Personal),
+		"hasError":         err != nil,
+	})
+	// #endregion
 	
 	return dashboards, err
 }

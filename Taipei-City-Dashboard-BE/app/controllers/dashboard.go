@@ -2,9 +2,13 @@
 package controllers
 
 import (
+	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
+	"os"
 	"strings"
+	"time"
 
 	"TaipeiCityDashboardBE/app/models"
 	"TaipeiCityDashboardBE/app/services"
@@ -15,6 +19,30 @@ import (
 	"gorm.io/gorm"
 )
 
+// #region agent log
+func writeDebugLog(hypothesisID, location, message string, data map[string]interface{}) {
+	payload := map[string]interface{}{
+		"sessionId":    "1c6a77",
+		"runId":        "pre-fix",
+		"hypothesisId": hypothesisID,
+		"location":     location,
+		"message":      message,
+		"data":         data,
+		"timestamp":    time.Now().UnixMilli(),
+	}
+	b, err := json.Marshal(payload)
+	if err != nil {
+		return
+	}
+	f, err := os.OpenFile("/Users/ncchen/Documents/Taipei-City-Dashboard/.cursor/debug-1c6a77.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return
+	}
+	defer f.Close()
+	_, _ = fmt.Fprintln(f, string(b))
+}
+// #endregion
+
 /*
 GetAllDashboards retrieves all dashboards from the database
 GET /api/v1/dashboard
@@ -23,7 +51,15 @@ User, Admin: Public and personal dashboards
 */
 func GetAllDashboards(c *gin.Context) {
 	// Get the user info from the context
-	_, accountID, _, _, _ := util.GetUserInfoFromContext(c)
+	loginType, accountID, isAdmin, _, permissions := util.GetUserInfoFromContext(c)
+	// #region agent log
+	writeDebugLog("H1", "app/controllers/dashboard.go:GetAllDashboards", "controller entered", map[string]interface{}{
+		"loginType":       loginType,
+		"accountID":       accountID,
+		"isAdmin":         isAdmin,
+		"permissionCount": len(permissions),
+	})
+	// #endregion
 	// _, _, _, _, permissions := util.GetUserInfoFromContext(c)
 	// groups := util.GetPermissionAllGroupIDs(permissions)
 
@@ -37,9 +73,23 @@ func GetAllDashboards(c *gin.Context) {
 	
 	dashboards, err := models.GetAllDashboards(accountID)
 	if err != nil {
+		// #region agent log
+		writeDebugLog("H2", "app/controllers/dashboard.go:GetAllDashboards", "model returned error", map[string]interface{}{
+			"accountID": accountID,
+			"error":     err.Error(),
+		})
+		// #endregion
 		c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": err.Error()})
 		return
 	}
+	// #region agent log
+	writeDebugLog("H5", "app/controllers/dashboard.go:GetAllDashboards", "controller success response", map[string]interface{}{
+		"publicCount":      len(dashboards.Public),
+		"taipeiCount":      len(dashboards.Taipei),
+		"metrotaipeiCount": len(dashboards.MetroTaipei),
+		"personalCount":    len(dashboards.Personal),
+	})
+	// #endregion
 
 	c.JSON(http.StatusOK, gin.H{"status": "success", "data": dashboards})
 }
