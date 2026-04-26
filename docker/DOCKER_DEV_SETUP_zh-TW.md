@@ -151,7 +151,7 @@ docker compose -f docker-compose-db.yaml logs -f qdrant
 
 ### I. 模型與 TWCC
 
-- `LM_MODEL_PATH`：建議填，本地模型路徑（容器內）
+- `LM_MODEL_PATH`：建議填，ONNX 模型在容器內的路徑。Dockerfile 將模型固定 COPY 至 `/opt/lm_model/onnx-e5`，因此此值應設為 `/opt/lm_model/onnx-e5/`（BE 程式碼預設值與此一致）。
 - `TWCC_API_URL`：可留空（有預設）
 - `TWCC_API_KEY`：若使用 TWCC 則必填
 - `TWCC_MODEL`：建議填
@@ -163,6 +163,7 @@ docker compose -f docker-compose-db.yaml logs -f qdrant
 
 - `docker/.env.template` 內是 `NGINX_IMAGE_tag`，但 compose 使用 `NGINX_IMAGE_TAG`
 - BE 全域設定使用 `QDRANT_COLLECTION`，`app/services/qdrant.go` 使用 `QDRANT_COLLECTION_NAME`
+- `LM_MODEL_PATH` 的路徑由 `Dockerfile` 決定（`COPY --from=model_export /out/onnx-e5 /opt/lm_model/onnx-e5`），正確值為 `/opt/lm_model/onnx-e5/`。舊版文件或 `.env` 若使用 `/opt/Taipei-City-Dashboard-BE/lm_model/onnx-e5/` 等其他路徑，容器啟動時向量搜尋功能將因找不到模型而失敗。
 
 為避免踩雷，`docker/.env` 兩組都已放入。
 
